@@ -113,25 +113,27 @@ io.on("connection", (socket) => {
 // ======================================================
 // BREVO EMAIL CONFIGURATION
 // ======================================================
-const brevoClient = SibApiV3Sdk.ApiClient.instance;
-const apiKey = brevoClient.authentications["api-key"];
-apiKey.apiKey = process.env.BREVO_API_KEY;
-
-const brevo = new SibApiV3Sdk.TransactionalEmailsApi();
-
 const sendBrevoEmail = async (to, subject, html) => {
-  const email = {
-    sender: { name: "MindMate", email: "care.mindmate@gmail.com" },
-    to: [{ email }],
-    subject,
-    htmlContent: html,
-  };
-
   try {
-    await brevo.sendTransacEmail(email);
-    console.log(`📧 Brevo email sent to ${to}`);
+    const response = await axios.post(
+      "https://api.brevo.com/v3/smtp/email",
+      {
+        sender: { name: "MindMate", email: "care.mindmate@gmail.com" },
+        to: [{ email: to }],
+        subject,
+        htmlContent: html,
+      },
+      {
+        headers: {
+          "api-key": process.env.BREVO_API_KEY,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    console.log(`✅ Brevo email sent to ${to}`, response.data);
   } catch (err) {
-    console.error("❌ Brevo email failed:", err.message);
+    console.error("❌ Brevo email failed:", err.response?.data || err.message);
   }
 };
 
