@@ -147,7 +147,7 @@ app.post("/api/contact", async (req, res) => {
 
   try {
     const adminMail = {
-      from: `MindMate Contact <${process.env.GMAIL_USER}>`,
+      from: `MindMate Contact <${process.env.SMTP_USER}>`,
       to: "care.mindmate@gmail.com",
       subject: `New Contact Form Message from ${name}`,
       html: `
@@ -163,7 +163,7 @@ app.post("/api/contact", async (req, res) => {
 
     // Optional: Auto-reply to user
     const userReply = {
-      from: `MindMate Care <care.mindmate@gmail.com>`,
+      from: `MindMate Care <${process.env.SMTP_USER}>`,
       to: email,
       subject: "Thank you for contacting MindMate 💜",
       html: `
@@ -191,7 +191,7 @@ app.post("/api/contact", async (req, res) => {
 const sendMail = async (to, subject, html) => {
   try {
     await transporter.sendMail({
-      from: `MindMate Care <care.mindmate@gmail.com>`,
+      from: `MindMate Care <${process.env.SMTP_USER}>`,
       to,
       subject,
       html,
