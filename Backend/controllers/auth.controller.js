@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/User.model.js";
 import Otp from "../models/Otp.model.js";
-import { sendMail } from "../utils/emailService.js";
+import { sendMail } from "../config/emailservice.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "mysecretdevkey";
 
