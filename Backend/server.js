@@ -8,7 +8,9 @@ import { Server } from "socket.io";
 import cron from "node-cron";
 import axios from "axios";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import SibApiV3Sdk from "@getbrevo/brevo"; // ✅ Brevo SDK
+import brevoPkg from "@getbrevo/brevo";
+
+ // ✅ Brevo SDK
 
 // Import Local Modules
 import connectDB from "./config/db.js";
@@ -26,6 +28,7 @@ dotenv.config();
 // ======================================================
 // EXPRESS & SOCKET.IO SETUP
 // ======================================================
+const SibApiV3Sdk = brevoPkg;
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
