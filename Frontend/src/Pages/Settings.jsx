@@ -141,6 +141,7 @@ useEffect(() => {
   const handleSaveSettings = async () => {
     try {
       const payload = {
+        profile,
         theme,
         color,
         font,

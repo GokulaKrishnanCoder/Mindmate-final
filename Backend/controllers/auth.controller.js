@@ -127,9 +127,23 @@ const getSettings = async (req, res) => {
   }
 };
 
+// const updateSettings = async (req, res) => {
+//   try {
+//     const user = await User.findByIdAndUpdate(req.user._id, { settings: req.body }, { new: true, select: "settings" });
+//     res.json(user.settings);
+//   } catch (err) {
+//     console.error("updateSettings error:", err);
+//     res.status(500).json({ message: "Error updating settings" });
+//   }
+// };
 const updateSettings = async (req, res) => {
   try {
-    const user = await User.findByIdAndUpdate(req.user._id, { settings: req.body }, { new: true, select: "settings" });
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    user.settings = { ...user.settings.toObject(), ...req.body };
+    await user.save();
+
     res.json(user.settings);
   } catch (err) {
     console.error("updateSettings error:", err);
