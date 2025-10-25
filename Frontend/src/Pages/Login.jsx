@@ -26,15 +26,7 @@ const Login = () => {
     if (token) navigate("/home");
   }, [navigate]);
 
-  useEffect(() => {
-    if (localStorage.getItem("registered") === "true") {
-      toast.success("Registered successfully! Please login to continue.", {
-        position: "top-right",
-        autoClose: 3000,
-      });
-      localStorage.removeItem("registered");
-    }
-  }, []);
+
 
 const handleLogin = async (e) => {
   e.preventDefault();

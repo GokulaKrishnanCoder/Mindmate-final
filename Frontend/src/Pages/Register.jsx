@@ -28,12 +28,8 @@ const Register = () => {
     setIsLoading(true);
     try {
       const res = await API.post("/auth/register", { name, email, password });
-      if (res.data.success) {
-        localStorage.setItem("registered", "true");
-        toast.success("Registered successfully! Please login.", {
-          position: "top-right",
-          autoClose: 3000,
-        });
+      if (res.status === 201) {
+        toast.success("Registered successfully! Please login.");
         navigate("/login");
       }
     } catch {
@@ -153,7 +149,9 @@ const Register = () => {
                   const decoded = jwtDecode(credentialResponse.credential);
                   const email = decoded.email;
                   try {
-                    const res = await API.post("/auth/googleRegister", { email });
+                    const res = await API.post("/auth/googleRegister", {
+                      email,
+                    });
                     localStorage.setItem("token", res.data.token);
                     localStorage.setItem("user", JSON.stringify(res.data.user));
                     navigate("/home");
