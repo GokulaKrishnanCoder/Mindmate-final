@@ -143,7 +143,7 @@ const Register = () => {
               Register
             </button>
 
-            <div className="google-login-btn mt-2">
+            <div className="google-login-btn mt-2 divider d-flex justify-content-center">
               <GoogleLogin
                 onSuccess={async (credentialResponse) => {
                   const decoded = jwtDecode(credentialResponse.credential);

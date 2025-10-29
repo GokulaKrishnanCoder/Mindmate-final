@@ -151,9 +151,6 @@ const CaretakerLogin = () => {
               </button>
             </form>
 
-            <div className="divider d-flex justify-content-center">
-              <span>Or</span>
-            </div>
 
             <div className="sign-up-link">
               Are you an admin?{" "}

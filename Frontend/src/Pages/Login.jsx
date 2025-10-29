@@ -162,7 +162,7 @@ const handleLogin = async (e) => {
               <span>Or</span>
             </div>
 
-            <div className="google-login-btn">
+            <div className="google-login-btn divider d-flex justify-content-center">
               <GoogleLogin
   onSuccess={async (credentialResponse) => {
     const decoded = jwtDecode(credentialResponse.credential);
