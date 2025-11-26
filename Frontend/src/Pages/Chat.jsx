@@ -124,53 +124,55 @@ const Chat = () => {
     const s = io(socketUrl, { auth: { token } });
     setSocket(s);
 
-s.on("receive_message", (chat) => {
-  const senderId = chat?.sender?._id || chat?.sender;
-  if (!senderId) return;
+    s.on("receive_message", (chat) => {
+      const senderId = chat?.sender?._id || chat?.sender;
+      if (!senderId) return;
 
-  // Ignore own messages
-  if (String(senderId) === String(currentUserId)) return;
+      // Ignore own messages
+      if (String(senderId) === String(currentUserId)) return;
 
-  // Add to messages (for open chat)
-  setMessages((prev) => [...prev, chat]);
+      // Add to messages (for open chat)
+      setMessages((prev) => [...prev, chat]);
 
-  // Detect if sender is a caretaker or user
-  const isCaretaker = caretakers.some((c) => String(c._id) === String(senderId));
+      // Detect if sender is a caretaker or user
+      const isCaretaker = caretakers.some((c) => String(c._id) === String(senderId));
 
-  // Update the combined user list so sorting works
-  setUsers((prev) => {
-    const idx = prev.findIndex((u) => String(u._id) === String(senderId));
-    if (idx === -1) return prev;
+      // Update the combined user list so sorting works
+      setUsers((prev) => {
+        const idx = prev.findIndex((u) => String(u._id) === String(senderId));
+        if (idx === -1) return prev;
 
-    const updated = {
-      ...prev[idx],
-      hasNewMsg: true,
-      lastMessageTime: chat.createdAt || new Date().toISOString(),
-    };
+        const updated = {
+          ...prev[idx],
+          hasNewMsg: true,
+          lastMessageTime: chat.createdAt || new Date().toISOString(),
+        };
 
-    // Move sender to top
-    const newArr = [updated, ...prev.slice(0, idx), ...prev.slice(idx + 1)];
-    return newArr;
-  });
+        // Move sender to top
+        const newArr = [updated, ...prev.slice(0, idx), ...prev.slice(idx + 1)];
+        return newArr;
+      });
 
-  // If sender is caretaker, also move inside caretakers list
-  if (isCaretaker) {
-    setCaretakers((prev) => {
-      const idx = prev.findIndex((c) => String(c._id) === String(senderId));
-      if (idx === -1) return prev;
+      // If sender is caretaker, also move inside caretakers list
+      if (isCaretaker) {
+        setCaretakers((prev) => {
+          const idx = prev.findIndex((c) => String(c._id) === String(senderId));
+          if (idx === -1) return prev;
 
-      const updatedCaretaker = {
-        ...prev[idx],
-        hasNewMsg: true,
-        lastMessageTime: chat.createdAt || new Date().toISOString(),
-      };
-      const newArr = [updatedCaretaker, ...prev.slice(0, idx), ...prev.slice(idx + 1)];
-      return newArr;
+          const updatedCaretaker = {
+            ...prev[idx],
+            hasNewMsg: true,
+            lastMessageTime: chat.createdAt || new Date().toISOString(),
+          };
+          const newArr = [
+            updatedCaretaker,
+            ...prev.slice(0, idx),
+            ...prev.slice(idx + 1),
+          ];
+          return newArr;
+        });
+      }
     });
-  }
-});
-
-
 
     s.on("connect_error", (err) => {
       console.error("Socket connect_error:", err);
@@ -180,7 +182,7 @@ s.on("receive_message", (chat) => {
       s.disconnect();
       setSocket(null);
     };
-  }, [currentUserId]);
+  }, [currentUserId, caretakers]);
 
   useEffect(() => {
     const fetchLists = async () => {
@@ -244,49 +246,52 @@ s.on("receive_message", (chat) => {
   }, [messages, aiMessages]);
 
   const handleSendToSocket = async (text) => {
-  if (!socket || !activeUser) return;
-  const payload = {
-  sender: currentUserId,
-  receiver: activeUser._id,
-  receiverType: activeUser.type?.toLowerCase(), // ✅ fix here
-  message: text,
-};
+    if (!socket || !activeUser) return;
+    const payload = {
+      sender: currentUserId,
+      receiver: activeUser._id,
+      receiverType: activeUser.type?.toLowerCase(), // ✅ fix here
+      message: text,
+    };
 
-  const optimistic = {
-    _id: `local-${Date.now()}`,
-    sender: currentUserId,
-    receiver: activeUser._id,
-    message: text,
-    createdAt: new Date().toISOString(),
-  };
+    const optimistic = {
+      _id: `local-${Date.now()}`,
+      sender: currentUserId,
+      receiver: activeUser._id,
+      message: text,
+      createdAt: new Date().toISOString(),
+    };
 
-  // optimistic message shown in UI
-  setMessages((prev) => [...prev, optimistic]);
+    // optimistic message shown in UI
+    setMessages((prev) => [...prev, optimistic]);
 
-  // Move the activeUser to top and clear new flag
-  setUsers((prev) => {
-    const idx = prev.findIndex((u) => String(u._id) === String(activeUser._id));
-    if (idx === -1) return prev;
-    const updatedUser = { ...prev[idx], hasNewMsg: false, lastMessageTime: optimistic.createdAt };
-    const newArr = [updatedUser, ...prev.slice(0, idx), ...prev.slice(idx + 1)];
-    return newArr;
-  });
-
-  socket.emit("send_message", payload);
-  try {
-    await API.post("/chat/updateprofile", {
-      receiverId: activeUser._id,
-      content: text,
+    // Move the activeUser to top and clear new flag
+    setUsers((prev) => {
+      const idx = prev.findIndex((u) => String(u._id) === String(activeUser._id));
+      if (idx === -1) return prev;
+      const updatedUser = {
+        ...prev[idx],
+        hasNewMsg: false,
+        lastMessageTime: optimistic.createdAt,
+      };
+      const newArr = [updatedUser, ...prev.slice(0, idx), ...prev.slice(idx + 1)];
+      return newArr;
     });
-  } catch (err) {
-    console.error("Failed to send message:", err);
-  } finally {
-    try {
-      window.dispatchEvent(new Event("profileUpdated"));
-    } catch (e) {}
-  }
-};
 
+    socket.emit("send_message", payload);
+    try {
+      await API.post("/chat/updateprofile", {
+        receiverId: activeUser._id,
+        content: text,
+      });
+    } catch (err) {
+      console.error("Failed to send message:", err);
+    } finally {
+      try {
+        window.dispatchEvent(new Event("profileUpdated"));
+      } catch (e) {}
+    }
+  };
 
   const handleAiSend = async (text) => {
     const userMsg = {
@@ -341,9 +346,17 @@ s.on("receive_message", (chat) => {
     setNewMessage("");
   };
 
+  // MODIFIED: Use a subtle neutral color for active sidebar items
   const sidebarItemStyle = (isActive) => ({
-    backgroundColor: isActive ? chosenColor : isDark ? "#0b1220" : "#fff",
-    color: isActive ? "#fff" : isDark ? "#ddd" : "#000",
+    backgroundColor: isActive
+      ? isDark
+        ? "#1e293b"
+        : "#e9ecef" // Subtle neutral highlight
+      : isDark
+      ? "#0b1220"
+      : "#fff", // Default background
+
+    color: isActive ? (isDark ? "#fff" : "#000") : isDark ? "#ddd" : "#000",
     borderRadius: 8,
     padding: "8px 10px",
     cursor: "pointer",
@@ -378,7 +391,7 @@ s.on("receive_message", (chat) => {
           overflow: "hidden",
         }}
       >
-        {/* Sidebar */}
+        {/* 1. Sidebar */}
         <Col
           md={4}
           lg={3}
@@ -394,15 +407,7 @@ s.on("receive_message", (chat) => {
           }}
         >
           <div style={{ padding: 16 }}>
-            {isMobile && activeUser && (
-              <Button
-                variant="light"
-                className="mb-3"
-                onClick={() => setShowSidebar(false)}
-              >
-                <BsArrowLeft /> Back
-              </Button>
-            )}
+            {/* REMOVED: Mobile 'Back' button from Sidebar */}
 
             <Form.Group className="mb-3">
               <Form.Control
@@ -436,15 +441,18 @@ s.on("receive_message", (chat) => {
                         const idx = prev.findIndex((p) => String(p._id) === String(u._id));
                         if (idx === -1) return prev;
                         const updatedUser = { ...prev[idx], hasNewMsg: false };
-                        const newArr = [updatedUser, ...prev.slice(0, idx), ...prev.slice(idx + 1)];
+                        const newArr = [
+                          updatedUser,
+                          ...prev.slice(0, idx),
+                          ...prev.slice(idx + 1),
+                        ];
                         return newArr;
                       });
 
                       if (isMobile) setShowSidebar(false);
-                    }}   
-                    active={
-                      activeUser?._id === u._id && activeUser?.type === "user"
-                    }
+                    }}
+                    // FIX: Set active to false to prevent default blue highlight
+                    active={false}
                     style={sidebarItemStyle(
                       activeUser?._id === u._id && activeUser?.type === "user"
                     )}
@@ -464,7 +472,11 @@ s.on("receive_message", (chat) => {
                         <div>{u.name}</div>
                         <div
                           className="small"
-                          style={{ color: isDark ? "rgba(255,255,255,0.6)" : "#6c757d" }}
+                          style={{
+                            color: isDark
+                              ? "rgba(255,255,255,0.6)"
+                              : "#6c757d",
+                          }}
                         >
                           {u.email}
                         </div>
@@ -496,35 +508,44 @@ s.on("receive_message", (chat) => {
                     key={`caretaker-${c._id}`}
                     action
                     onClick={() => {
-  setActiveUser({ ...c, type: "caretaker" });
+                      setActiveUser({ ...c, type: "caretaker" });
 
-  // Clear new badge and move caretaker to top
-  setCaretakers((prev) => {
-    const idx = prev.findIndex((p) => String(p._id) === String(c._id));
-    if (idx === -1) return prev;
+                      // Clear new badge and move caretaker to top
+                      setCaretakers((prev) => {
+                        const idx = prev.findIndex(
+                          (p) => String(p._id) === String(c._id)
+                        );
+                        if (idx === -1) return prev;
 
-    const updatedCaretaker = { ...prev[idx], hasNewMsg: false };
-    const newArr = [updatedCaretaker, ...prev.slice(0, idx), ...prev.slice(idx + 1)];
-    return newArr;
-  });
+                        const updatedCaretaker = { ...prev[idx], hasNewMsg: false };
+                        const newArr = [
+                          updatedCaretaker,
+                          ...prev.slice(0, idx),
+                          ...prev.slice(idx + 1),
+                        ];
+                        return newArr;
+                      });
 
-  // Also reflect it in the combined user list
-  setUsers((prev) => {
-    const idx = prev.findIndex((p) => String(p._id) === String(c._id));
-    if (idx === -1) return prev;
+                      // Also reflect it in the combined user list
+                      setUsers((prev) => {
+                        const idx = prev.findIndex(
+                          (p) => String(p._id) === String(c._id)
+                        );
+                        if (idx === -1) return prev;
 
-    const updated = { ...prev[idx], hasNewMsg: false };
-    const newArr = [updated, ...prev.slice(0, idx), ...prev.slice(idx + 1)];
-    return newArr;
-  });
+                        const updated = { ...prev[idx], hasNewMsg: false };
+                        const newArr = [
+                          updated,
+                          ...prev.slice(0, idx),
+                          ...prev.slice(idx + 1),
+                        ];
+                        return newArr;
+                      });
 
-  if (isMobile) setShowSidebar(false);
-}}
-
-                    active={
-                      activeUser?._id === c._id &&
-                      activeUser?.type === "caretaker"
-                    }
+                      if (isMobile) setShowSidebar(false);
+                    }}
+                    // FIX: Set active to false to prevent default blue highlight
+                    active={false}
                     style={sidebarItemStyle(
                       activeUser?._id === c._id &&
                         activeUser?.type === "caretaker"
@@ -546,7 +567,9 @@ s.on("receive_message", (chat) => {
                         <div
                           className="small"
                           style={{
-                            color: isDark ? "rgba(255,255,255,0.6)" : "#6c757d",
+                            color: isDark
+                              ? "rgba(255,255,255,0.6)"
+                              : "#6c757d",
                           }}
                         >
                           {c.role || "Caretaker"}
@@ -554,29 +577,28 @@ s.on("receive_message", (chat) => {
                       </div>
                     </div>
                     <div className="d-flex align-items-center gap-2">
-  {c.hasNewMsg && (
-    <Badge
-      bg="danger"
-      style={{
-        fontSize: "0.7rem",
-        background: chosenColor,
-        color: "#fff",
-      }}
-    >
-      New
-    </Badge>
-  )}
-  <Badge
-    bg={isDark ? "secondary" : "light"}
-    style={{
-      color: isDark ? "#ddd" : chosenColor,
-      border: `1px solid ${chosenColor}`,
-    }}
-  >
-    Caretaker
-  </Badge>
-</div>
-
+                      {c.hasNewMsg && (
+                        <Badge
+                          bg="danger"
+                          style={{
+                            fontSize: "0.7rem",
+                            background: chosenColor,
+                            color: "#fff",
+                          }}
+                        >
+                          New
+                        </Badge>
+                      )}
+                      <Badge
+                        bg={isDark ? "secondary" : "light"}
+                        style={{
+                          color: isDark ? "#ddd" : chosenColor,
+                          border: `1px solid ${chosenColor}`,
+                        }}
+                      >
+                        Caretaker
+                      </Badge>
+                    </div>
                   </ListGroup.Item>
                 ))}
             </ListGroup>
@@ -593,7 +615,8 @@ s.on("receive_message", (chat) => {
                   });
                   if (isMobile) setShowSidebar(false);
                 }}
-                active={activeUser?.type === "ai"}
+                // FIX: Set active to false to prevent default blue highlight
+                active={false}
                 style={sidebarItemStyle(activeUser?.type === "ai")}
               >
                 <div className="d-flex align-items-center justify-content-between">
@@ -610,7 +633,9 @@ s.on("receive_message", (chat) => {
                       <div
                         className="small"
                         style={{
-                          color: isDark ? "rgba(255,255,255,0.6)" : "#6c757d",
+                          color: isDark
+                            ? "rgba(255,255,255,0.6)"
+                            : "#6c757d",
                         }}
                       >
                         Virtual assistant
@@ -632,173 +657,191 @@ s.on("receive_message", (chat) => {
           </div>
         </Col>
 
-        {/* ✅ Chat Area */}
-<Col
-  md={8}
-  lg={9}
-  style={{
-    height: "100%",
-    display: "flex",
-    flexDirection: "column",
-    background: isDark ? "#071027" : "#f1f3f5",
-    width: isMobile ? "100%" : undefined,
-    position: "relative",
-  }}
->
-  {!activeUser ? (
-    <div
-      style={{
-        width: 340,
-        background: isDark ? "#0b1220" : "#fff",
-        boxShadow: "0 2px 12px rgba(0,0,0,0.12)",
-        borderRadius: 16,
-        textAlign: "center",
-        padding: 32,
-        margin: "auto",
-      }}
-    >
-      <Figure.Image
-        width={64}
-        height={64}
-        src={logo}
-        roundedCircle
-        className="mb-3"
-        style={{
-          filter: isDark ? "none" : "brightness(0)",
-          transition: "filter 0.3s ease",
-        }}
-      />
-      <h4 style={{ color: chosenColor, marginBottom: 8 }}>MindMate</h4>
-      <div>Welcome to chat!<br />Select a conversation to start chatting.</div>
-    </div>
-  ) : (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-        width: "100%",
-        position: "relative",
-      }}
-    >
-      {/* ✅ Fixed Header */}
-      <div
-        style={{
-          flexShrink: 0,
-          position: "sticky",
-          top: 0,
-          zIndex: 5,
-          padding: "10px 16px",
-          borderBottom: `1px solid ${isDark ? "#111827" : "#e9ecef"}`,
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          background: isDark ? "#071027" : "#f1f3f5",
-        }}
-      >
-        {isMobile && (
-          <Button
-            variant="link"
-            className="p-0 me-2"
-            onClick={() => setShowSidebar(true)}
+        {/* 2. Chat Area (Conditionally Rendered on Mobile: only show if NOT mobile OR sidebar is NOT showing) */}
+        {(!isMobile || !showSidebar) && (
+          <Col
+            md={8}
+            lg={9}
+            style={{
+              height: "100%",
+              display: "flex",
+              flexDirection: "column",
+              background: isDark ? "#071027" : "#f1f3f5",
+              width: isMobile ? "100%" : undefined,
+              position: "relative",
+            }}
           >
-            <BsArrowLeft size={20} color={chosenColor} />
-          </Button>
+            {!activeUser ? (
+              <div
+                style={{
+                  width: 340,
+                  background: isDark ? "#0b1220" : "#fff",
+                  boxShadow: "0 2px 12px rgba(0,0,0,0.12)",
+                  borderRadius: 16,
+                  textAlign: "center",
+                  padding: 32,
+                  margin: "auto",
+                }}
+              >
+                <Figure.Image
+                  width={64}
+                  height={64}
+                  src={logo}
+                  roundedCircle
+                  className="mb-3"
+                  style={{
+                    filter: isDark ? "none" : "brightness(0)",
+                    transition: "filter 0.3s ease",
+                  }}
+                />
+                <h4 style={{ color: chosenColor, marginBottom: 8 }}>
+                  MindMate
+                </h4>
+                <div>
+                  Welcome to chat!
+                  <br />
+                  Select a conversation to start chatting.
+                </div>
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  height: "100%",
+                  width: "100%",
+                  position: "relative",
+                }}
+              >
+                {/* ✅ Fixed Header - Alignment Corrected */}
+                <div
+                  style={{
+                    flexShrink: 0,
+                    position: "sticky",
+                    top: 0,
+                    zIndex: 5,
+                    padding: "10px 16px",
+                    borderBottom: `1px solid ${isDark ? "#111827" : "#e9ecef"}`,
+                    display: "flex",
+                    // FIX: Vertically center all items in the header
+                    alignItems: "center",
+                    gap: 12,
+                    background: isDark ? "#071027" : "#f1f3f5",
+                  }}
+                >
+                  {isMobile && (
+                    <Button
+                      variant="link"
+                      className="p-0 me-2"
+                      onClick={() => setShowSidebar(true)}
+                    >
+                      <BsArrowLeft size={20} color={chosenColor} />
+                    </Button>
+                  )}
+                  <Figure.Image
+                    width={40}
+                    height={40}
+                    src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
+                      activeUser.name || "User"
+                    )}&background=random`}
+                    roundedCircle
+                    className="me-2"
+                  />
+                  {/* FIX: Explicitly set alignment for name/email block */}
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <div style={{ fontWeight: 600 }}>{activeUser.name}</div>
+                    <div className="small text-muted">
+                      {activeUser.type === "caretaker"
+                        ? activeUser.role || "Caretaker"
+                        : activeUser.email || ""}
+                    </div>
+                  </div>
+                </div>
+
+                {/* ✅ Scrollable Messages Only */}
+                <div
+                  style={{
+                    flex: 1,
+                    overflowY: "auto",
+                    padding: "16px",
+                    background: isDark ? "#071027" : "#f1f3f5",
+                    scrollBehavior: "smooth",
+                  }}
+                >
+                  {activeUser.type === "ai" ? (
+                    aiMessages.map((m, idx) => (
+                      <MessageBubble
+                        key={`ai-${idx}-${m.createdAt}`}
+                        msg={m}
+                        isMe={m.role === "user"}
+                        chosenColor={chosenColor}
+                      />
+                    ))
+                  ) : isLoadingMessages ? (
+                    <div className="d-flex justify-content-center align-items-center h-100">
+                      <Spinner animation="border" style={{ color: chosenColor }} />
+                    </div>
+                  ) : (
+                    messages.map((m, idx) => (
+                      <MessageBubble
+                        key={m._id || `msg-${idx}-${m.createdAt}`}
+                        msg={m}
+                        isMe={
+                          String(m.sender?.id || m.sender) ===
+                          String(currentUserId)
+                        }
+                        chosenColor={chosenColor}
+                      />
+                    ))
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+
+                {/* ✅ Fixed Input Bar */}
+                <div
+                  style={{
+                    flexShrink: 0,
+                    position: "sticky",
+                    bottom: 0,
+                    zIndex: 5,
+                    padding: 12,
+                    borderTop: `1px solid ${isDark ? "#111827" : "#e9ecef"}`,
+                    background: isDark ? "#071029" : "#fff",
+                  }}
+                >
+                  <Form onSubmit={handleSend}>
+                    <div className="d-flex gap-2">
+                      <Form.Control
+                        type="text"
+                        placeholder={`Message ${activeUser.name}`}
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        autoComplete="off"
+                      />
+                      <Button
+                        type="submit"
+                        disabled={!newMessage.trim()}
+                        style={{
+                          background: chosenColor,
+                          borderColor: chosenColor,
+                          flexShrink: 0,
+                        }}
+                      >
+                        <BsSend />
+                      </Button>
+                    </div>
+                  </Form>
+                </div>
+              </div>
+            )}
+          </Col>
         )}
-        <Figure.Image
-          width={40}
-          height={40}
-          src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
-            activeUser.name || "User"
-          )}&background=random`}
-          roundedCircle
-          className="me-2"
-        />
-        <div>
-          <div style={{ fontWeight: 600 }}>{activeUser.name}</div>
-          <div className="small text-muted">
-            {activeUser.type === "caretaker"
-              ? activeUser.role || "Caretaker"
-              : activeUser.email || ""}
-          </div>
-        </div>
-      </div>
-
-      {/* ✅ Scrollable Messages Only */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: "auto",
-          padding: "16px",
-          background: isDark ? "#071027" : "#f1f3f5",
-          scrollBehavior: "smooth",
-        }}
-      >
-        {activeUser.type === "ai" ? (
-          aiMessages.map((m, idx) => (
-            <MessageBubble
-              key={`ai-${idx}-${m.createdAt}`}
-              msg={m}
-              isMe={m.role === "user"}
-              chosenColor={chosenColor}
-            />
-          ))
-        ) : isLoadingMessages ? (
-          <div className="d-flex justify-content-center align-items-center h-100">
-            <Spinner animation="border" style={{ color: chosenColor }} />
-          </div>
-        ) : (
-          messages.map((m, idx) => (
-            <MessageBubble
-              key={m._id || `msg-${idx}-${m.createdAt}`}
-              msg={m}
-              isMe={String(m.sender?.id || m.sender) === String(currentUserId)}
-              chosenColor={chosenColor}
-            />
-          ))
-        )}
-        <div ref={chatEndRef} />
-      </div>
-
-      {/* ✅ Fixed Input Bar */}
-      <div
-        style={{
-          flexShrink: 0,
-          position: "sticky",
-          bottom: 0,
-          zIndex: 5,
-          padding: 12,
-          borderTop: `1px solid ${isDark ? "#111827" : "#e9ecef"}`,
-          background: isDark ? "#071029" : "#fff",
-        }}
-      >
-        <Form onSubmit={handleSend}>
-          <div className="d-flex gap-2">
-            <Form.Control
-              type="text"
-              placeholder={`Message ${activeUser.name}`}
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              autoComplete="off"
-            />
-            <Button
-              type="submit"
-              disabled={!newMessage.trim()}
-              style={{
-                background: chosenColor,
-                borderColor: chosenColor,
-                flexShrink: 0,
-              }}
-            >
-              <BsSend />
-            </Button>
-          </div>
-        </Form>
-      </div>
-    </div>
-  )}
-</Col>
-
       </Row>
     </Container>
   );
